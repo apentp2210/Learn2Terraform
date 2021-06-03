@@ -4,7 +4,12 @@ variable "region" {
 }
 variable "aws_access_key" {}
 variable "aws_secret_key" {}
-variable "key_name" {}
+variable "key_name" {
+  default = "key1"
+}
+variable "private_key_path" {
+  default = "E:\\terraform\\key1.pem"
+}
 
 #PROVIDER
 provider "aws" {
@@ -107,10 +112,22 @@ resource "aws_security_group" "allow_ssh" {
 resource "aws_instance" "nginx" {
   ami                    = data.aws_ami.aws-linux.id
   instance_type          = "t2.medium"
-  key_name               = "keypair1"
+  key_name               = "key1"
   subnet_id = aws_subnet.subnet1.id
   vpc_security_group_ids = [aws_security_group.allow_ssh.id]
 
+  provisioner "remote-exec" {
+    inline = [
+      "sudo yum -y install nginx",
+      "sudo service nginx start"
+    ]
+    connection {
+      type = "ssh"
+      host = self.public_ip
+      user = "ec2-user"
+      private_key = file(var.private_key_path)
+    }
+  }
 }
 
 #OUTPUT
