@@ -5,7 +5,6 @@ variable "region" {
 variable "aws_access_key" {}
 variable "aws_secret_key" {}
 variable "key_name" {}
-variable "private_key_path" {}
 
 #PROVIDER
 provider "aws" {
@@ -36,18 +35,18 @@ data "aws_ami" "aws-linux" {
 }
 
 #RESOURCE
-resource "aws_vpc" "UAT-VPC" {
+resource "aws_vpc" "vpc1" {
   cidr_block = "10.0.0.0/16"
   enable_dns_support = "true"
   enable_dns_hostnames = "true"
 
   tags = {
-    Name = "UAT-VPC"
+    Name = "vpc1"
   }
 }
 
 resource "aws_subnet" "subnet1" {  
-  vpc_id = aws_vpc.UAT-VPC.id
+  vpc_id = aws_vpc.vpc1.id
   cidr_block = "10.0.1.0/24"
   map_public_ip_on_launch = "true"
   availability_zone = "us-east-1a"
@@ -56,29 +55,34 @@ resource "aws_subnet" "subnet1" {
   }
 }
 
-resource "aws_internet_gateway" "UAT-igw" {
-  vpc_id = aws_vpc.UAT-VPC.id
+resource "aws_internet_gateway" "igw1" {
+  vpc_id = aws_vpc.vpc1.id
   tags = {
-    Name = "UAT-igw"
+    Name = "igw1"
   }
 }
 
-resource "aws_route_table" "UAT-routetable" {
-  vpc_id = aws_vpc.UAT-VPC.id
+resource "aws_route_table" "routetable1" {
+  vpc_id = aws_vpc.vpc1.id
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = "${aws_internet_gateway.UAT-igw.id}"
+    gateway_id = aws_internet_gateway.igw1.id
   }
 
   tags = {
-    Name = "UAT-routetable"
+    Name = "routetable1"
   }
+}
+
+resource "aws_route_table_association" "crta1" {
+  subnet_id = aws_subnet.subnet1.id
+  route_table_id = aws_route_table.routetable1.id
 }
 
 resource "aws_security_group" "allow_ssh" {
   name        = "nginx_demo"
   description = "Allow ports for nginx demo"
-  vpc_id      = aws_vpc.UAT-VPC.id
+  vpc_id      = aws_vpc.vpc1.id
 
   ingress {
     from_port   = 22
@@ -102,24 +106,11 @@ resource "aws_security_group" "allow_ssh" {
 
 resource "aws_instance" "nginx" {
   ami                    = data.aws_ami.aws-linux.id
-  instance_type          = "t3.medium"
-  key_name               = file(var.private_key_path)
+  instance_type          = "t2.medium"
+  key_name               = "keypair1"
   subnet_id = aws_subnet.subnet1.id
   vpc_security_group_ids = [aws_security_group.allow_ssh.id]
 
-  provisioner "remote-exec" {
-    inline = [
-      "sudo yum install nginx -y",
-      "sudo service nginx start"
-    ]
-    connection {
-      type        = "ssh"
-      host        = self.public_ip
-      user        = "ec2-user"
-      private_key = file("E:\\terraform\\key2.ppk")
-
-    }
-  }
 }
 
 #OUTPUT
